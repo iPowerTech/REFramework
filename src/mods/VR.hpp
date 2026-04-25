@@ -202,6 +202,7 @@ public:
 
 private:
     Vector4f get_position_unsafe(uint32_t index) const;
+    Matrix4x4f get_vr_matrix(uint32_t index) const;
     Vector4f get_velocity_unsafe(uint32_t index) const;
     Vector4f get_angular_velocity_unsafe(uint32_t index) const;
 
