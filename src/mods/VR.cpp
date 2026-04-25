@@ -2525,6 +2525,8 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
 
                         auto fix_2d_position = [&](const Vector4f& target_position, bool screen_correction = true,
                                                    std::optional<float> custom_ui_scale = std::nullopt) {
+                            Vector3f re9_icon_rot;
+
                             if (!custom_ui_scale) {
                                 custom_ui_scale = world_ui_scale;
                             }
@@ -2562,18 +2564,19 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
                                // make matrix from direction worls space
                                auto look_at_matrix =
                                    glm::rowMajor4(glm::lookAtLH(Vector3f{}, Vector3f{direction}, Vector3f(0.0f, 1.0f, 0.0f)));
-
+                                   
                              
 
                                // Calculate Gui rotation matrix then apply vr offset
                                glm::quat l_wanted_rotation{};
                                const auto gui_rotation_offset = get_gui_rotation_offset();
-                               l_wanted_rotation = glm::extractMatrixRotation(look_at_matrix) *
-                                                            Matrix4x4f{-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1};
+                               auto look_at_matrix_inv = glm::inverse(look_at_matrix); 
+                               l_wanted_rotation = glm::extractMatrixRotation(look_at_matrix_inv);
                                l_wanted_rotation = gui_rotation_offset * l_wanted_rotation;
 
 
                                // Apply new Gui Rotation 
+                               re9_icon_rot = Vector3f( l_wanted_rotation.x, l_wanted_rotation.y, l_wanted_rotation.z);
                                const auto wanted_rotation_mat = Matrix4x4f{l_wanted_rotation};
                                gui_matrix = wanted_rotation_mat;
                                gui_matrix[3] = new_pos;
@@ -2614,6 +2617,7 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
                                 if (screen_correction) {
                                    Vector3f half_size{gui_size.w / 2.0f, gui_size.h / 2.0f, 0.0f};
                                    sdk::call_object_func<void*>(object, "set_Position", context, object, &half_size);
+                                  
                                 }
 
 
@@ -2623,8 +2627,40 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
                                 sdk::call_object_func<void*>(object, "set_Scale", context, object, &new_scale);
                             };
 
+                             auto re9_fix_transform_object = [&](::REManagedObject* object, Vector3f rot) {
+                                static auto transform_object_type = sdk::find_type_definition("via.gui.TransformObject");
+
+                                if (object == nullptr) {
+                                    return;
+                                }
+
+                                const auto t = utility::re_managed_object::get_type_definition(object);
+
+                                if (t == nullptr || !t->is_a(transform_object_type)) {
+                                    return;
+                                }
+
+                                // sdk::call_object_func<void*>(object, "set_ResolutionAdjust", context, object, true);
+
+                                if (screen_correction) {
+                                    Vector3f half_size{gui_size.w / 2.0f, gui_size.h / 2.0f, 0.0f};
+                                    sdk::call_object_func<void*>(object, "set_Position", context, object, &half_size);
+                                    sdk::call_object_func<void*>(object, "set_Rotation", context, object, rot);
+                                }
+
+                                // Vector4f new_scale{ scale, scale, scale, 1.0f };
+                                const auto old_scale = sdk::call_object_func_easy<Vector4f>(object, "get_Scale");
+                                Vector4f new_scale{old_scale.y, old_scale.y, old_scale.z, 1.0f};
+                                sdk::call_object_func<void*>(object, "set_Scale", context, object, &new_scale);
+                            };
+
                             for (auto c = child; c != nullptr; c = sdk::call_object_func<REManagedObject*>(c, "get_Next", context, c)) {
-                                fix_transform_object(c);
+                                
+                                if (name_hash == "Gui_ui2010"_fnv) {
+                                    re9_fix_transform_object(c, re9_icon_rot);
+                                }else{
+                                    fix_transform_object(c);
+                                }
                             }
 
                             // Fix for other kinds of world pos attach elements.
