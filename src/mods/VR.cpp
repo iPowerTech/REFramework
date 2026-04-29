@@ -76,6 +76,10 @@ std::unique_ptr<FunctionHook> g_post_effect_draw_hook{};
 std::unique_ptr<FunctionHook> g_wwise_listener_update_hook{};
 //std::unique_ptr<FunctionHook> g_get_sharpness_hook{};
 
+
+std::unique_ptr<FunctionHook> g_make_screen_pos_hook{};
+
+
 #if TDB_VER <= 49
 std::optional<regenny::via::Size> g_previous_size{};
 #endif
@@ -595,6 +599,11 @@ void VR::wwise_listener_update_hook(void* listener) {
         mod->restore_audio_camera();
     }
 }
+
+
+
+
+
 
 // put it on the backburner
 /*
@@ -1513,6 +1522,9 @@ void VR::update_camera() {
     }
 #endif
 
+
+
+
     update_camera_origin();
 
     auto projection_matrix = get_current_projection_matrix(true);
@@ -1553,6 +1565,7 @@ void VR::update_camera_origin() {
 
     auto camera_object = utility::re_component::get_game_object(camera);
 
+
     if (camera_object == nullptr || camera_object->transform == nullptr) {
         spdlog::error("VR: Failed to get camera game object or transform!");
         m_needs_camera_restore = false;
@@ -1573,6 +1586,7 @@ void VR::update_camera_origin() {
         m_original_camera_matrix = Matrix4x4f{m_original_camera_rotation};
         m_original_camera_matrix[3] = m_original_camera_position;
     }
+
 
     apply_hmd_transform(camera_joint);
 }
@@ -1615,6 +1629,14 @@ void VR::apply_hmd_transform(::REJoint* camera_joint) {
         sdk::set_joint_position(camera_joint, position);   
     }
 }
+
+void VR::apply_hmd_transform(::REGameObject* gameObject) {
+    auto rotation = glm::quat(sdk::call_object_func_easy<Vector4f>(gameObject, "get_Rotation"));
+    auto position = sdk::call_object_func_easy<Vector4f>(gameObject, "get_Position");
+    apply_hmd_transform(rotation, position);
+}
+
+
 
 bool VR::is_hand_behind_head(VRRuntime::Hand hand, float sensitivity) const {
     if (hand > VRRuntime::Hand::RIGHT || !is_using_controllers()) {
@@ -2525,6 +2547,7 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
 
                         auto fix_2d_position = [&](const Vector4f& target_position, bool screen_correction = true,
                                                    std::optional<float> custom_ui_scale = std::nullopt) {
+                            
                             Vector3f re9_icon_rot;
 
                             if (!custom_ui_scale) {
@@ -2553,33 +2576,46 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
 
 
                            // RE9: Handle interaction icons (Gui_ui2010) GameObject
-                           // These must be oriented towards the VR camera matrix
                            if (name_hash == "Gui_ui2010"_fnv) {
 
-                               // Icon world position (x,y,z)
-                               auto icon_world_pos = target_position;
-                               icon_world_pos.w = 0.0f;
+
+
+                               const auto& l_camera_matrix = m_original_camera_matrix;
+                               const auto& l_camera_position = l_camera_matrix[3];
+          
+                               auto delta_dir = l_camera_position - target_position;
+                               delta_dir.w = 0.0f;
+
+
+                              //glm::quat cam_rot = glm::extractMatrixRotation(l_camera_matrix);
+                              //glm::vec3 euler = glm::eulerAngles(cam_rot);
+                              //euler.x = -euler.x;
+                              //glm::quat cam_rot_pitch_inverted = glm::quat(euler);
+                              //glm::quat flip_y180 = glm::angleAxis(glm::pi<float>(), glm::vec3(0.0f, 1.0f, 0.0f));
+                              //
+                              glm::quat l_wanted_rotation{};
+                              const auto l_gui_rotation_offset = get_gui_rotation_offset();
 
                                
-                               // make matrix from direction worls space
-                               auto look_at_matrix =
-                                   glm::rowMajor4(glm::lookAtLH(Vector3f{}, Vector3f{direction}, Vector3f(0.0f, 1.0f, 0.0f)));
-                                   
-                             
+                              // l_wanted_rotation = cam_rot_pitch_inverted; //(cam_rot_pitch_inverted * flip_y180);
 
-                               // Calculate Gui rotation matrix then apply vr offset
-                               glm::quat l_wanted_rotation{};
-                               const auto gui_rotation_offset = get_gui_rotation_offset();
-                               auto look_at_matrix_inv = glm::inverse(look_at_matrix); 
-                               l_wanted_rotation = glm::extractMatrixRotation(look_at_matrix_inv);
-                               l_wanted_rotation = gui_rotation_offset * l_wanted_rotation;
+                           
+                               l_wanted_rotation = glm::extractMatrixRotation(l_camera_matrix) * Matrix4x4f{
+                                       -1,  0,  0,  0, 
+                                        0,  1,  0,  0, 
+                                        0,  0, -1,  0, 
+                                        0,  0,  0,  1
+                               };
 
 
-                               // Apply new Gui Rotation 
-                               re9_icon_rot = Vector3f( l_wanted_rotation.x, l_wanted_rotation.y, l_wanted_rotation.z);
-                               const auto wanted_rotation_mat = Matrix4x4f{l_wanted_rotation};
-                               gui_matrix = wanted_rotation_mat;
-                               gui_matrix[3] = new_pos;
+    
+                               l_wanted_rotation = l_gui_rotation_offset * l_wanted_rotation;
+
+                               const auto l_wanted_rotation_mat = Matrix4x4f{l_wanted_rotation};
+
+                               gui_matrix = l_wanted_rotation_mat;
+                               gui_matrix[3] = l_camera_position + l_wanted_rotation_mat[2] * m_re9_action_button_z_offset->value() +
+                                               l_wanted_rotation_mat[0] * m_re9_action_button_x_offset->value();
                                gui_matrix[3].w = 1.0f;
 
                            }
@@ -2595,9 +2631,12 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
                             const auto scaled_ui_scale = *custom_ui_scale * 0.01f;
                             const auto distance = glm::length(delta_dir);
                             const auto scale = std::clamp<float>(distance * scaled_ui_scale, 0.1f, 100.0f);
+                            //spdlog::info("VR: DISTANCE {} ", distance);
 
                             regenny::via::Size gui_size{};
                             sdk::call_object_func<void*>(view, "get_ScreenSize", &gui_size, context, view);
+
+
 
                             auto fix_transform_object = [&](::REManagedObject* object) {
                                 static auto transform_object_type = sdk::find_type_definition("via.gui.TransformObject");
@@ -2627,7 +2666,7 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
                                 sdk::call_object_func<void*>(object, "set_Scale", context, object, &new_scale);
                             };
 
-                             auto re9_fix_transform_object = [&](::REManagedObject* object, Vector3f rot) {
+                            auto re9_fix_transform_object = [&](::REManagedObject* object) {
                                 static auto transform_object_type = sdk::find_type_definition("via.gui.TransformObject");
 
                                 if (object == nullptr) {
@@ -2641,23 +2680,15 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
                                 }
 
                                 // sdk::call_object_func<void*>(object, "set_ResolutionAdjust", context, object, true);
-
-                                if (screen_correction) {
-                                    Vector3f half_size{gui_size.w / 2.0f, gui_size.h / 2.0f, 0.0f};
-                                    sdk::call_object_func<void*>(object, "set_Position", context, object, &half_size);
-                                    sdk::call_object_func<void*>(object, "set_Rotation", context, object, rot);
-                                }
-
-                                // Vector4f new_scale{ scale, scale, scale, 1.0f };
-                                const auto old_scale = sdk::call_object_func_easy<Vector4f>(object, "get_Scale");
-                                Vector4f new_scale{old_scale.y, old_scale.y, old_scale.z, 1.0f};
-                                sdk::call_object_func<void*>(object, "set_Scale", context, object, &new_scale);
+                              
+                                Vector3f panel_pos{1.0f, 0.0f, 0.0f};
+                                sdk::call_object_func<void*>(object, "set_Position", context, object, &panel_pos);
+                               
                             };
 
                             for (auto c = child; c != nullptr; c = sdk::call_object_func<REManagedObject*>(c, "get_Next", context, c)) {
-                                
                                 if (name_hash == "Gui_ui2010"_fnv) {
-                                    re9_fix_transform_object(c, re9_icon_rot);
+                                    re9_fix_transform_object(c);
                                 }else{
                                     fix_transform_object(c);
                                 }
@@ -2864,7 +2895,7 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
                                 sdk::call_object_func<Vector4f*>(
                                    game_object->transform, "get_Position", &interact_icon_position, context, game_object->transform);
                                 //spdlog::info("VR: on_pre_gui_draw_element: {} {} ", name, t->get_type()->name);
-                                fix_2d_position(interact_icon_position);  
+                                fix_2d_position(interact_icon_position, true);  
                             }
 
                         } else {
@@ -3900,6 +3931,11 @@ void VR::on_draw_ui() {
     m_ui_scale_option->draw("2D UI Scale");
     m_ui_distance_option->draw("2D UI Distance");
     m_world_ui_scale_option->draw("World-Space UI Scale");
+
+    m_re9_action_button_x_offset->draw("RE9 Action Button X Offset");
+    m_re9_action_button_y_offset->draw("RE9 Action Button Y Offset");
+    m_re9_action_button_z_offset->draw("RE9 Action Button Distance Offset");
+
 
     ImGui::DragFloat3("Overlay Rotation", (float*)&m_overlay_rotation, 0.01f, -360.0f, 360.0f);
     ImGui::DragFloat3("Overlay Position", (float*)&m_overlay_position, 0.01f, -100.0f, 100.0f);

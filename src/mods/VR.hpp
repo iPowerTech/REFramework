@@ -162,6 +162,7 @@ public:
 
     void apply_hmd_transform(glm::quat& rotation, Vector4f& position);
     void apply_hmd_transform(::REJoint* camera_joint);
+    void apply_hmd_transform(::REGameObject* gameObject);
     
     bool is_hand_behind_head(VRRuntime::Hand hand, float sensitivity = 0.2f) const;
     bool is_action_active(vr::VRActionHandle_t action, vr::VRInputValueHandle_t source = vr::k_ulInvalidInputValueHandle) const;
@@ -506,6 +507,11 @@ private:
     const ModSlider::Ptr m_world_ui_scale_option{ ModSlider::create(generate_name("WorldSpaceUIScale"), 1.0f, 100.0f, 15.0f) };
     const ModSlider::Ptr m_resolution_scale{ ModSlider::create(generate_name("OpenXRResolutionScale"), 0.1f, 5.0f, 1.0f) };
 
+    const ModSlider::Ptr m_re9_action_button_x_offset{ModSlider::create(generate_name("R9ActionButtonXOffset"), -50.0f, 50.0f, 0.0f)};
+    const ModSlider::Ptr m_re9_action_button_y_offset{ModSlider::create(generate_name("R9ActionButtonYOffset"), -50.0f, 50.0f, 0.0f)};
+    const ModSlider::Ptr m_re9_action_button_z_offset{ModSlider::create(generate_name("R9ActionButtonDistanceOffset"), 0.0f, 50.0f, 25.0f)};
+
+
     const ModToggle::Ptr m_force_fps_settings{ ModToggle::create(generate_name("ForceFPS"), true) };
     const ModToggle::Ptr m_force_aa_settings{ ModToggle::create(generate_name("ForceAntiAliasing"), true) };
     const ModToggle::Ptr m_force_motionblur_settings{ ModToggle::create(generate_name("ForceMotionBlur"), true) };
@@ -562,7 +568,10 @@ private:
         *m_resolution_scale,
         *m_desktop_fix,
         *m_desktop_fix_skip_present,
-        *m_enable_asynchronous_rendering
+        *m_enable_asynchronous_rendering, 
+        *m_re9_action_button_x_offset, 
+        *m_re9_action_button_y_offset,
+        *m_re9_action_button_z_offset
     };
 
     bool m_use_rotation{true};
