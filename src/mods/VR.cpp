@@ -2890,6 +2890,8 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
                        
                         } else if (re9_interact_trigger_key_input != nullptr) { // RE9
 
+                             //spdlog::info("VR: on_pre_gui_draw_element : {} ", name);
+                             
                              if (game_object->transform != nullptr && name_hash == "Gui_ui2010"_fnv) {
                                 Vector4f interact_icon_position{};
                                 sdk::call_object_func<Vector4f*>(
