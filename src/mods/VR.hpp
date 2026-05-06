@@ -511,6 +511,7 @@ private:
     const ModSlider::Ptr m_re9_action_button_x_offset{ModSlider::create(generate_name("R9ActionButtonXOffset"), -50.0f, 50.0f, 0.0f)};
     const ModSlider::Ptr m_re9_action_button_y_offset{ModSlider::create(generate_name("R9ActionButtonYOffset"), -50.0f, 50.0f, 0.0f)};
     const ModSlider::Ptr m_re9_action_button_z_offset{ModSlider::create(generate_name("R9ActionButtonDistanceOffset"), 0.0f, 50.0f, 25.0f)};
+    const ModToggle::Ptr m_re9_action_button_flip_rotation{ModToggle::create(generate_name("R9ActionButtonFlipRotation"), false)};
 
 
     const ModToggle::Ptr m_force_fps_settings{ ModToggle::create(generate_name("ForceFPS"), true) };
@@ -580,7 +581,8 @@ private:
         *m_enable_asynchronous_rendering, 
         *m_re9_action_button_x_offset, 
         *m_re9_action_button_y_offset,
-        *m_re9_action_button_z_offset
+        *m_re9_action_button_z_offset, 
+        *m_re9_action_button_flip_rotation
     };
 
     bool m_use_rotation{true};

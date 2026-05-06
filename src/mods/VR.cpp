@@ -2581,7 +2581,9 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
                               // l_wanted_rotation = cam_rot_pitch_inverted; //(cam_rot_pitch_inverted * flip_y180);
 
                            
-                               l_wanted_rotation = glm::extractMatrixRotation(l_camera_matrix) * Matrix4x4f{
+                               l_wanted_rotation = glm::extractMatrixRotation(l_camera_matrix);
+                               
+                               const auto inverseMatrix = Matrix4x4f{
                                        -1,  0,  0,  0, 
                                         0,  1,  0,  0, 
                                         0,  0, -1,  0, 
@@ -2589,6 +2591,10 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
                                };
 
 
+                               if (m_re9_action_button_flip_rotation->value()) {
+
+                                   l_wanted_rotation = l_wanted_rotation * inverseMatrix
+                               }
     
                                l_wanted_rotation = l_gui_rotation_offset * l_wanted_rotation;
 
@@ -2654,7 +2660,7 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
                                     return;
                                 }
 
-                                const auto t = utility::re_managed_object::get_type_definition(object);
+                                const auto t = object->get_type_definition();
 
                                 if (t == nullptr || !t->is_a(transform_object_type)) {
                                     return;
@@ -2870,10 +2876,10 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
 
                              //spdlog::info("VR: on_pre_gui_draw_element : {} ", name);
                              
-                             if (game_object->transform != nullptr && name_hash == "Gui_ui2010"_fnv) {
+                             if (game_object->get_transform() != nullptr && name_hash == "Gui_ui2010"_fnv) {
                                 Vector4f interact_icon_position{};
-                                sdk::call_object_func<Vector4f*>(
-                                   game_object->transform, "get_Position", &interact_icon_position, context, game_object->transform);
+                                sdk::call_object_func<Vector4f*>(game_object->get_transform(), "get_Position", &interact_icon_position,
+                                    context, game_object->get_transform());
                                 //spdlog::info("VR: on_pre_gui_draw_element: {} {} ", name, t->get_type()->name);
                                 fix_2d_position(interact_icon_position, true);  
                             }
@@ -3914,6 +3920,7 @@ void VR::on_draw_ui() {
     m_re9_action_button_x_offset->draw("RE9 Action Button X Offset");
     m_re9_action_button_y_offset->draw("RE9 Action Button Y Offset");
     m_re9_action_button_z_offset->draw("RE9 Action Button Distance Offset");
+    m_re9_action_button_flip_rotation->draw("RE9 Action Button Flip position");
 
 
     ImGui::DragFloat3("Overlay Rotation", (float*)&m_overlay_rotation, 0.01f, -360.0f, 360.0f);
