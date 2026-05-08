@@ -202,6 +202,8 @@ public:
         m_last_crosshair_hide = std::chrono::steady_clock::now();
     }
 
+    bool IsRe9ActionButtonActive();
+
 private:
     Vector4f get_position_unsafe(uint32_t index) const;
     Matrix4x4f get_vr_matrix(uint32_t index) const;
@@ -511,7 +513,7 @@ private:
     const ModSlider::Ptr m_re9_action_button_x_offset{ModSlider::create(generate_name("R9ActionButtonXOffset"), -50.0f, 50.0f, 0.0f)};
     const ModSlider::Ptr m_re9_action_button_y_offset{ModSlider::create(generate_name("R9ActionButtonYOffset"), -50.0f, 50.0f, 0.0f)};
     const ModSlider::Ptr m_re9_action_button_z_offset{ModSlider::create(generate_name("R9ActionButtonDistanceOffset"), 0.0f, 50.0f, 25.0f)};
-    const ModToggle::Ptr m_re9_action_button_flip_rotation{ModToggle::create(generate_name("R9ActionButtonFlipRotation"), false)};
+    //const ModToggle::Ptr m_re9_action_button_flip_rotation{ModToggle::create(generate_name("R9ActionButtonFlipRotation"), truem_re9_action_button_)};
 
 
     const ModToggle::Ptr m_force_fps_settings{ ModToggle::create(generate_name("ForceFPS"), true) };
@@ -522,6 +524,9 @@ private:
     const ModToggle::Ptr m_force_volumetrics_settings{ ModToggle::create(generate_name("ForceVolumetrics"), true) };
     const ModToggle::Ptr m_force_lensflares_settings{ ModToggle::create(generate_name("ForceLensFlares"), true) };
     const ModToggle::Ptr m_force_dynamic_shadows_settings{ ModToggle::create(generate_name("ForceDynamicShadows"), true) };
+
+    std::string m_gui_object_name = "";
+
 
 #ifdef REFRAMEWORK_UNIVERSAL
     const ModToggle::Ptr m_allow_engine_overlays{ ModToggle::create(generate_name("AllowEngineOverlays_V2"), sdk::GameIdentity::get().tdb_ver() < 73) };
@@ -581,8 +586,8 @@ private:
         *m_enable_asynchronous_rendering, 
         *m_re9_action_button_x_offset, 
         *m_re9_action_button_y_offset,
-        *m_re9_action_button_z_offset, 
-        *m_re9_action_button_flip_rotation
+        *m_re9_action_button_z_offset 
+        //*m_re9_action_button_flip_rotation
     };
 
     bool m_use_rotation{true};

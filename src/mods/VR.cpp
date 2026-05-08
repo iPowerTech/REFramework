@@ -2363,6 +2363,18 @@ struct GUIRestoreData {
 
 thread_local std::vector<std::unique_ptr<GUIRestoreData>> g_elements_to_reset{};
 
+// RE9 check if Action Button is visible
+bool VR::IsRe9ActionButtonActive() {
+
+    if (m_gui_object_name != nullptr) {
+        const auto name_hash = utility::hash(m_gui_object_name);
+        if (name_hash == "Gui_ui2010"_fnv) {
+            return true;
+        } 
+        return false;
+    }
+}
+
 bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_context) {
     inside_gui_draw = true;
 
@@ -2378,7 +2390,7 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
 
         const auto name = game_object->get_name();
         const auto name_hash = utility::hash(name);
-
+        m_gui_object_name = name;
 
         switch (name_hash) {
         // Don't mess with this, causes weird black boxes on the sides of the screen
@@ -2559,8 +2571,6 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
                            // RE9: Handle interaction icons (Gui_ui2010) GameObject
                            if (name_hash == "Gui_ui2010"_fnv) {
 
-
-
                                const auto& l_camera_matrix = m_original_camera_matrix;
                                const auto& l_camera_position = l_camera_matrix[3];
           
@@ -2574,28 +2584,15 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
                               //glm::quat cam_rot_pitch_inverted = glm::quat(euler);
                               //glm::quat flip_y180 = glm::angleAxis(glm::pi<float>(), glm::vec3(0.0f, 1.0f, 0.0f));
                               //
+
                               glm::quat l_wanted_rotation{};
                               const auto l_gui_rotation_offset = get_gui_rotation_offset();
 
                                
                               // l_wanted_rotation = cam_rot_pitch_inverted; //(cam_rot_pitch_inverted * flip_y180);
 
-                           
-                               l_wanted_rotation = glm::extractMatrixRotation(l_camera_matrix);
-                               
-                               const auto inverseMatrix = Matrix4x4f{
-                                       -1,  0,  0,  0, 
-                                        0,  1,  0,  0, 
-                                        0,  0, -1,  0, 
-                                        0,  0,  0,  1
-                               };
-
-
-                               if (m_re9_action_button_flip_rotation->value()) {
-
-                                   l_wanted_rotation = l_wanted_rotation * inverseMatrix
-                               }
-    
+                               l_wanted_rotation = glm::extractMatrixRotation(l_camera_matrix) * Matrix4x4f{-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1};
+                        
                                l_wanted_rotation = l_gui_rotation_offset * l_wanted_rotation;
 
                                const auto l_wanted_rotation_mat = Matrix4x4f{l_wanted_rotation};
@@ -2718,8 +2715,7 @@ bool VR::on_pre_gui_draw_element(REComponent* gui_element, void* primitive_conte
                         switch (name_hash) {
                         case "damage_ui2102"_fnv:
                         case "NightVision_Filter"_fnv:
-                        case "Gui_ui2010"_fnv:
-                            //wants_face_glue = true;
+                            wants_face_glue = true;
                             break;
                         default:
                             break;
@@ -3920,7 +3916,7 @@ void VR::on_draw_ui() {
     m_re9_action_button_x_offset->draw("RE9 Action Button X Offset");
     m_re9_action_button_y_offset->draw("RE9 Action Button Y Offset");
     m_re9_action_button_z_offset->draw("RE9 Action Button Distance Offset");
-    m_re9_action_button_flip_rotation->draw("RE9 Action Button Flip position");
+    //m_re9_action_button_flip_rotation->draw("RE9 Action Button Flip position");
 
 
     ImGui::DragFloat3("Overlay Rotation", (float*)&m_overlay_rotation, 0.01f, -360.0f, 360.0f);
